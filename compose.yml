@@ -1,6 +1,6 @@
 services:
   the-brain:
-    image: the-brain:latest
+    image: ghcr.io/hastur-hp/the-brain:latest
     container_name: the_brain
     restart: unless-stopped
     network_mode: "host"
