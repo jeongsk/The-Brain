@@ -1,4 +1,5 @@
 # The Brain - Multimodal RAG
+![License](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.11-blue) ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 The Brain is a Retrieval-Augmented Generation (RAG) dashboard and 3D Knowledge Graph visualizer. It is designed to ingest multimodal documents (text, images, tables, equations) and provide an interactive interface for querying and exploring the resulting knowledge base. 
 
@@ -12,14 +13,90 @@ https://github.com/user-attachments/assets/fee7508f-98a0-407b-84b5-4300738b4b29
 * **RAG Pipeline:** LightRAG and RAG-Anything.
 * **Document Parser:** MinerU (handles PDF layout detection, OCR, and multimodal extraction).
 * **Databases:** Neo4j (Knowledge Graph) and NanoVectorDB (Vector Storage).
-* **Reranker:** `BAAI/bge-reranker-v2-m3` (Downloaded and loaded into memory automatically on the first application startup).
+* **Reranker:** Default `BAAI/bge-reranker-v2-m3` (Downloaded and loaded into memory automatically on the first application startup). Can be changed to external if needed
+
+## Settings
+### Engine
+
+Different engines are supported and easily configurable. You can set the base URLs for multiple engines inside the compose file and swap between them just by changing the `LLM_ENGINE` variable.
+
+| VARIABLE   | VALUE                                              |
+| ---------- | -------------------------------------------------- |
+| LLM_ENGINE | `ollama`, `llamacpp`, `vllm`, `lmstudio`, `openai` |
+#### Provider
+Set the value to your service endpoint, these are just placeholders
+
+| PROVIDER  | VARIABLE           | VALUE                                            |
+| --------- | ------------------ | ------------------------------------------------ |
+| Ollama    | OLLAMA_BASE_URL    | http://localhost:11434                           |
+| LM Studio | LM_STUDIO_BASE_URL | http://localhost:1234/v1                         |
+| VLLM      | VLLM_BASE_URL      | http://localhost:8000/v1                         |
+| llama.cpp | LLAMA_CPP_BASE_URL | http://localhost:8080/v1                         |
+| OpenAI    | OPENAI_BASE_URL    | https://api.openai.com/v1                        |
+|           | RERANKER_BASE_URL  | **Optional**: set if you want custom  a reranker |
+#### API Key
+Remember to set a "dummy" API key if you are using a provider based on OpenAI
+
+| VARIABLE       | VALUE             |
+| -------------- | ----------------- |
+| OPENAI_API_KEY | sk-local-test-key |
+
+
+### Models & Settings
+
+#### Models to use
+With these variables you are defining what models to use
+
+
+| VARIABLE        | EXAMPLE             | INFO                                                                    |
+| --------------- | ------------------- | ----------------------------------------------------------------------- |
+| LLM_MODEL       | qwen3.5:9b          | The text model used for entity extraction and querying.                 |
+| VISION_MODEL    | qwen2.5vl:latest    | The multimodal model used for processing images, tables, and equations. |
+| EMBEDDING_MODEL | qwen3-embedding:8b  | The model used for vectorizing text.                                    |
+| RERANKER_MODEL  | qwen3-reranker-0.6b | **Optional**: The model useid for reranking query results.              |
+
+#### Settings
+These are the variables you can set to control context size for example. You need to look up what settings are best suited for your setup.
+
+**LLM**
+
+| VARIABLE      | EXAMPLE | INFO                                                                    |
+| ------------- | ------- | ----------------------------------------------------------------------- |
+| LLM_NUM_CTX   | 32768   | Context window. Max tokens the LLM can process in a single request      |
+| LLM_TIMEOUT   | 300     | Maximum time (in seconds) to wait for an LLM response before canceling. |
+| LLM_MAX_ASYNC | 1       | Max number of concurrent requests allowed to the LLM.                   |
+
+**Embedding**
+
+| VARIABLE            | EXAMPLE | INFO                                                                                                 |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------- |
+| EMBEDDING_DIM       | 4096    | The output vector size of your chosen embedding model. Must exactly match your model's architecture! |
+| MAX_EMBED_TOKENS    | 8192    | The maximum context window of your embedding model.                                                  |
+| EMBEDDING_TIMEOUT   | 300     | Maximum time (in seconds) to wait for the embedding API to return vectors.                           |
+| EMBEDDING_MAX_ASYNC | 1       | Max concurrent requests to the embedding model.                                                      |
+
+**Chunks**
+
+| VARIABLE           | EXAMPLE | INFO                                                   |
+| ------------------ | ------- | ------------------------------------------------------ |
+| CHUNK_SIZE         | 600     | The target number of tokens per document slice.        |
+| CHUNK_OVERLAP_SIZE | 100     | The number of tokens shared between sequential chunks. |
+
+## Storage
+All knowledge graph data is stored in two named volumes
+
+| Volume              | Info                                      |
+| ------------------- | ----------------------------------------- |
+| thebrain_data       | vector DBs, upload history, parsed output |
+| lightrag_neo4j_data | Neo4j graph                               |
 
 ## Quick Start
 
-The application is distributed via the GitHub Container Registry. No local build is required.
+### Prerequisites
+- Docker and Docker Compose
+- An LLM provider (Local or External)
 
-Create a `compose.yml` file:
-
+### 1 Create your compose file
 ```yaml
 services:
   the-brain:
@@ -28,17 +105,29 @@ services:
     restart: unless-stopped
     network_mode: "host"
     environment:
-      # Local Connection
-      - OLLAMA_BASE_URL=http://localhost:11434
+      # Active engine provider
+      # Options: ollama, openai, vllm, lmstudio, llamacpp
+      - LLM_ENGINE=llamacpp
 
-      # External Connection (uncomment to use)
-      #- OPENAI_API_KEY=
-      #- OPENAI_BASE_URL=
+      # Provider URLs
+      - OLLAMA_BASE_URL=http://localhost:11434
+      - LM_STUDIO_BASE_URL=http://localhost:1234/v1
+      - VLLM_BASE_URL=http://localhost:8000/v1
+      - LLAMA_CPP_BASE_URL=http://localhost:8080/v1
+      - OPENAI_BASE_URL=https://api.openai.com/v1
+
+      # API key
+      - OPENAI_API_KEY=sk-local-test-key
 
       # Models
       - LLM_MODEL=qwen3.5:9b
       - EMBEDDING_MODEL=qwen3-embedding:8b
       - VISION_MODEL=qwen2.5vl:latest
+
+      # Reranker config
+      # If not set, the default model inside container will be used
+      #- RERANKER_BASE_URL=
+      #- RERANKER_MODEL=
 
       # Model Settings & Tuning
       - LLM_NUM_CTX=32768
@@ -89,7 +178,13 @@ services:
     healthcheck:
       test:
         [
-          "CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD}", "RETURN 1",
+          "CMD",
+          "cypher-shell",
+          "-u",
+          "neo4j",
+          "-p",
+          "${NEO4J_PASSWORD}",
+          "RETURN 1",
         ]
       interval: 10s
       timeout: 5s
@@ -104,62 +199,19 @@ volumes:
     name: thebrain_data
   thebrain_mineru_models:
     name: thebrain_mineru_models
-````
+```
 
-**Change Password!**
-Remember to change the password for the neo4j container.
+### 2. Set DB Password
+Set a new password for neo4j inside your `.env` file with the variable `NEO4J_PASSWORD`
 
-Run the stack:
-
-Bash
-
+### 3. Start the Stack
 ```
 docker compose up -d
 ```
 
+### 4. Open the UI
 Access the application at `http://localhost:8100`.
 
-## Environment Variable Configuration
-
-The application dynamically routes requests based on the provided environment variables.
-
-### API Routing
-
-- `OPENAI_API_KEY`: If this variable is populated, the application will automatically route all LLM, Vision, and Embedding requests to the external API.
-    
-- `OPENAI_BASE_URL`: Defines the external endpoint. Defaults to standard OpenAI, but can be pointed to GitHub Models (`https://models.inference.ai.azure.com`), DeepSeek, Groq, or any OpenAI-compatible proxy.
-    
-- `OLLAMA_BASE_URL`: If `OPENAI_API_KEY` is empty, the application falls back to this local Ollama instance.
-    
-
-### Models & Dimensions
-
-- `LLM_MODEL`: The text model used for entity extraction and querying.
-    
-- `VISION_MODEL`: The multimodal model used for processing images, tables, and equations.
-    
-- `EMBEDDING_MODEL`: The model used for vectorizing text.
-    
-- `EMBEDDING_DIM`: This must match the exact output dimension of your chosen `EMBEDDING_MODEL` 
-    
-
-### Concurrency & Rate Limiting
-
-- `LLM_MAX_ASYNC` & `EMBEDDING_MAX_ASYNC`: Controls the maximum number of concurrent API requests made during document processing.
-    
-    - **Local Hardware:** Tune based on VRAM capacity.
-        
-    - **Free Tier APIs (e.g., GitHub Models):** Keep at `1` to avoid `429 Too Many Requests` errors.
-        
-    - **Paid APIs (e.g., OpenAI Tier 2+):** Increase to `10` or higher to process documents significantly faster.
-        
-
-### Document Processing
-
-- `CHUNK_SIZE`: Token length for document splitting.
-    
-- `CHUNK_OVERLAP_SIZE`: Number of overlapping tokens between chunks to preserve context.
-    
 
 ## Web UI
 
@@ -198,6 +250,13 @@ The application dynamically routes requests based on the provided environment va
 ![dashboard](./assets/graph_1.png)
 ![dashboard](./assets/graph_2.png)
 ![dashboard](./assets/graph_3.png)
+
+## Environment Variable Configuration
+
+The application dynamically routes requests based on the provided environment variables.
+
+
+    
 ## Acknowledgements
 
 This project relies heavily on the open-source research and engineering from the **HKUDS (HKU Data Science Lab)** team.
