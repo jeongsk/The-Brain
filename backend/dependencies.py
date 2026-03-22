@@ -8,6 +8,10 @@ from backend.config import (
     NEO4J_USERNAME,
     NEO4J_PASSWORD,
     NEO4J_DATABASE,
+    RERANKER_MODEL,
+    RERANKER_BASE_URL,
+    OPENAI_API_KEY,
+    LLM_TIMEOUT,
 )
 
 # Setup base logger so routers can use it
@@ -23,7 +27,12 @@ neo4j_manager = Neo4jManager(
     database=NEO4J_DATABASE,
 )
 
-document_reranker = DocumentReranker()
+document_reranker = DocumentReranker(
+    model_name=RERANKER_MODEL,
+    base_url=RERANKER_BASE_URL,
+    api_key=OPENAI_API_KEY,
+    timeout=LLM_TIMEOUT,
+)
 
 
 # Create a state container for things that load asynchronously during lifespan

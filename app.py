@@ -141,26 +141,51 @@ async def lifespan(app: FastAPI):
         enable_equation_processing=True,
     )
 
-    if OPENAI_API_KEY:
-        base_logger.info("OPENAI_API_KEY detected. Routing LLM to External API.")
-        provider = OpenAIProvider(
-            api_key=OPENAI_API_KEY,
-            base_url=OPENAI_BASE_URL,
-            llm_model=LLM_MODEL,
-            vision_model=VISION_MODEL,
-            embed_model=EMBEDDING_MODEL,
-            timeout=LLM_TIMEOUT,
-        )
-    else:
-        base_logger.info("No OPENAI_API_KEY detected. Routing LLM to local Ollama.")
-        provider = OllamaProvider(
-            base_url=OLLAMA_BASE_URL,
-            llm_model=LLM_MODEL,
-            vision_model=VISION_MODEL,
-            embed_model=EMBEDDING_MODEL,
-            num_ctx=LLM_NUM_CTX,
-            timeout=LLM_TIMEOUT,
-        )
+    # LLM engine routing
+    # Settings for every provider
+    common_kwargs = {
+        "llm_model": LLM_MODEL,
+        "vision_model": VISION_MODEL,
+        "embed_model": EMBEDDING_MODEL,
+        "timeout": LLM_TIMEOUT,
+    }
+
+    # Map engines to their specific Provider class and unique variables
+    engine_registry = {
+        "openai": {
+            "class": OpenAIProvider,
+            "kwargs": {"api_key": OPENAI_API_KEY, "base_url": OPENAI_BASE_URL},
+        },
+        "vllm": {
+            "class": OpenAIProvider,
+            "kwargs": {"api_key": OPENAI_API_KEY, "base_url": VLLM_BASE_URL},
+        },
+        "lmstudio": {
+            "class": OpenAIProvider,
+            "kwargs": {"api_key": OPENAI_API_KEY, "base_url": LM_STUDIO_BASE_URL},
+        },
+        "llamacpp": {
+            "class": OpenAIProvider,
+            "kwargs": {"api_key": OPENAI_API_KEY, "base_url": LLAMA_CPP_BASE_URL},
+        },
+        "ollama": {
+            "class": OllamaProvider,
+            "kwargs": {"base_url": OLLAMA_BASE_URL, "num_ctx": LLM_NUM_CTX},
+        },
+    }
+
+    # Look up the chosen engine (fallback to 'ollama')
+    selected_engine = engine_registry.get(LLM_ENGINE, engine_registry["ollama"])
+    ProviderClass = selected_engine["class"]
+    specific_kwargs = selected_engine["kwargs"]
+
+    # Instantiate the provider
+    provider = ProviderClass(**common_kwargs, **specific_kwargs)
+
+    base_logger.info(
+        f"Routing LLM using '{LLM_ENGINE}' engine via {ProviderClass.__name__} "
+        f"at {specific_kwargs.get('base_url')}"
+    )
 
     lightrag_instance = LightRAG(
         working_dir=WORKING_DIR,

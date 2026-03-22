@@ -1,17 +1,25 @@
 import os
 from pathlib import Path
 
-# Local Ollama
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+# Engine selection
+LLM_ENGINE = os.getenv("LLM_ENGINE", "ollama").lower()
 
-# External API (OpenAI, DeepSeek, Groq, etc.)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Base URLs
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
+LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1")
+LLAMA_CPP_BASE_URL = os.getenv("LLAMA_CPP_BASE_URL", "http://localhost:8080/v1")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+RERANKER_BASE_URL = os.getenv("RERANKER_BASE_URL", "http://localhost:8080/v1")
+
+# External API keys
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "sk-no-key-required")
 
 # Model names
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen3.5:9b")
 VISION_MODEL = os.getenv("VISION_MODEL", "qwen2.5vl:latest")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:8b")
+RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3")
 
 # Model settings
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "600"))
