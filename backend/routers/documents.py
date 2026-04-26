@@ -56,24 +56,24 @@ async def upload_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File must have a filename")
 
     safe_filename = re.sub(r"[^A-Za-z0-9_.-]", "_", file.filename)
-    if Path(file.filename).suffix.lower() not in ALLOWED_EXTENSIONS:
+    if Path(safe_filename).suffix.lower() not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="File type not supported")
 
     content = await file.read()
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="File too large (max 500 MB)")
 
-    dest = Path(UPLOAD_DIR) / file.filename
+    dest = Path(UPLOAD_DIR) / safe_filename
     with dest.open("wb") as fh:
         fh.write(content)
 
-    job = job_manager.new_job(file.filename)
+    job = job_manager.new_job(safe_filename)
     job.push("queued", f"File received: {file.filename}")
     job_manager.processing_queue.append((job, str(dest)))
 
     return {
         "job_id": job.id,
-        "filename": file.filename,
+        "filename": safe_filename,
         "queue_position": len(job_manager.processing_queue),
     }
 

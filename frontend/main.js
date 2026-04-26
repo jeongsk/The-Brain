@@ -333,9 +333,9 @@ async function processQueue() {
     }
   }
   btn.disabled = false; btn.textContent = 'Process Queue ▶';
-  // Switch to dashboard
-  document.querySelector('[data-tab="dashboard"]').click();
   await refreshAll();
+  // Switch to dashboard after jobs are loaded so failed-upload check has current S.jobs
+  document.querySelector('[data-tab="dashboard"]').click();
 }
 
 function updateQueueBadge() {
